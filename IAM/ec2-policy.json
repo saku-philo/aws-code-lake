@@ -15,7 +15,7 @@
         "ec2:RebootInstances"
       ],
       "Resource": [
-        "arn:aws:ec2:ap-northeast-1:220384310940:instance/i-0ce7815258219da16"
+        "arn:aws:ec2:ap-northeast-1:<accountID>:instance/<instanceID>"
       ]
     }
   ]
