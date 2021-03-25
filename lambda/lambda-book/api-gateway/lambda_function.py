@@ -37,8 +37,6 @@ def sendmail(to, subject, body):
 
 # idのauto incrementを返す関数 アトミックカウンタ
 # https://docs.aws.amazon.com/ja_jp/amazondynamodb/latest/developerguide/GettingStarted.Python.03.html#GettingStarted.Python.03.04
-
-
 def next_seq(table, tablename):
     response = table.update_item(
         Key={
@@ -51,7 +49,6 @@ def next_seq(table, tablename):
         ReturnValues="UPDATED_NEW"
     )
     return response['Attributes']['seq']
-
 
 def lambda_handler(event, context):
     try:
@@ -81,7 +78,7 @@ def lambda_handler(event, context):
         presigned_url = s3.generate_presigned_url(
             ClientMethod='get_object',
             Params={
-                'Bucket': 'saku-lambda-write-test',
+                'Bucket': 'hoge',
                 'Key': 'app.zip'
             },
             ExpiresIn=2 * 60 * 60,
