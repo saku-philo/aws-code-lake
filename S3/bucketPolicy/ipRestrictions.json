@@ -1,0 +1,26 @@
+// オブジェクト取得IP制限
+{
+  "Version": "2012-10-17",
+  "Id": "SourceIP",
+  "Statement": [
+    {
+      "Sid": "SourceIP",
+      "Effect": "Deny",
+      "Principal": "*",
+      "Action": "s3:GetObject",
+      "Resource": [
+        "arn:aws:s3:::s3-bucket-name",
+        "arn:aws:s3:::s3-bucket-name/*"
+      ],
+      "Condition": {
+        "NotIpAddress": {
+          "aws:SourceIp": [
+            "1.2.3.4/32",
+            "2.3.4.0/24",
+            "3.4.0.0/16"
+          ]
+        }
+      }
+    }
+  ]
+}
