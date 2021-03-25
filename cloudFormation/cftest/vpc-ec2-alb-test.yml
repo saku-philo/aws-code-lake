@@ -1,0 +1,576 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+# -----------------------------------------------------------------------------#
+# 内容説明
+# -----------------------------------------------------------------------------#
+Description:  This template deploys a VPC, with a pair of public and private subnets spread
+  across two Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets. It deploys a pair of NAT gateways (one in each AZ),
+  and default routes for them in the private subnets.
+
+# -----------------------------------------------------------------------------#
+# 使用パラメータ
+# -----------------------------------------------------------------------------#
+Parameters:
+  EnvironmentName:
+    Description: An environment name that is prefixed to resource names
+    Type: String
+
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: String
+    Default: 10.0.0.0/16
+
+  # Subnet
+  PublicSubnet1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.11.0/24
+
+  PublicSubnet2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the public subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.12.0/24
+
+  PrivateSubnetWeb1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the first Availability Zone
+    Type: String
+    Default: 10.0.21.0/24
+
+  PrivateSubnetWeb2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.22.0/24
+
+  PrivateSubnetWeb3CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.23.0/24
+
+  PrivateSubnetDB1CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.31.0/24
+
+  PrivateSubnetDB2CIDR:
+    Description: Please enter the IP range (CIDR notation) for the private subnet in the second Availability Zone
+    Type: String
+    Default: 10.0.32.0/24
+
+  # Keypair
+  KeyName:
+    Description: 'Key pair name for SSH access'
+    Type: 'AWS::EC2::KeyPair::KeyName'
+
+  # EC2 image
+  # 以下は最新AMIを取得
+  Ec2ImageId:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+
+Mappings:
+  RegionMap:
+    'ap-south-1':
+      AMI: 'ami-2ed19c41'
+    'eu-west-3':
+      AMI: 'ami-c8a017b5'
+    'eu-west-2':
+      AMI: 'ami-e3051987'
+    'eu-west-1':
+      AMI: 'ami-760aaa0f'
+    'ap-northeast-2':
+      AMI: 'ami-fc862292'
+    'ap-northeast-1':
+      AMI: 'ami-2803ac4e'
+    'sa-east-1':
+      AMI: 'ami-1678037a'
+    'ca-central-1':
+      AMI: 'ami-ef3b838b'
+    'ap-southeast-1':
+      AMI: 'ami-dd7935be'
+    'ap-southeast-2':
+      AMI: 'ami-1a668878'
+    'eu-central-1':
+      AMI: 'ami-e28d098d'
+    'us-east-1':
+      AMI: 'ami-6057e21a'
+    'us-east-2':
+      AMI: 'ami-aa1b34cf'
+    'us-west-1':
+      AMI: 'ami-1a033c7a'
+    'us-west-2':
+      AMI: 'ami-32d8124a'
+
+# -----------------------------------------------------------------------------#
+# 各リソース
+# -----------------------------------------------------------------------------#
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  ## --------Subnet---------
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+
+  ### Private Subnet
+  PrivateSubnetWeb1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetWeb1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet CP (AZ1)
+
+  PrivateSubnetWeb2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetWeb2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet CP (AZ2)
+
+  PrivateSubnetWeb3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetWeb3CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet CMS (AZ1)
+
+  PrivateSubnetDB1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetDB1CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet DB (AZ1)
+
+  PrivateSubnetDB2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnetDB2CIDR
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet DB (AZ2)
+
+  ## ----------NATGateway-----------
+  NatGateway1EIP:
+    Type: AWS::EC2::EIP
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+
+  # NatGateway2EIP:
+  #   Type: AWS::EC2::EIP
+  #   DependsOn: InternetGatewayAttachment
+  #   Properties:
+  #     Domain: vpc
+
+  NatGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGateway1EIP.AllocationId
+      SubnetId: !Ref PublicSubnet1
+
+  # NatGateway2:
+  #   Type: AWS::EC2::NatGateway
+  #   Properties:
+  #     AllocationId: !GetAtt NatGateway2EIP.AllocationId
+  #     SubnetId: !Ref PublicSubnet2
+
+  ## -----------ルートテーブル作成------------------
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  ### ルーティングの設定
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  ### ルートテーブルの関連付け
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  ### Privateルートテーブル作成
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes (AZ1)
+
+  DefaultPrivateRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway1
+
+  ### プライベートサブネットのルートテーブル関連付け
+  PrivateSubnetWeb1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetWeb1
+
+  PrivateSubnetWeb2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetWeb2
+
+  PrivateSubnetWeb3RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetWeb3
+
+  PrivateSubnetDB1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetDB1
+
+  PrivateSubnetDB2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnetDB2
+
+  # PrivateRouteTable2:
+  #   Type: AWS::EC2::RouteTable
+  #   Properties:
+  #     VpcId: !Ref VPC
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${EnvironmentName} Private Routes (AZ2)
+
+  # DefaultPrivateRoute2:
+  #   Type: AWS::EC2::Route
+  #   Properties:
+  #     RouteTableId: !Ref PrivateRouteTable2
+  #     DestinationCidrBlock: 0.0.0.0/0
+  #     NatGatewayId: !Ref NatGateway2
+
+  NoIngressSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "no-ingress-sg"
+      GroupDescription: "Security group with no ingress rule"
+      VpcId: !Ref VPC
+
+  ## ------------CPサーバEC2インスタンス(amazon Linux2)-------------
+  EC2InstanceCP1:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't2.micro'
+      SecurityGroupIds:
+      - !Ref InstanceCPSecurityGroup
+      KeyName: !Ref KeyName
+      ImageId: !Ref Ec2ImageId
+      # ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      SubnetId: !Ref PrivateSubnetWeb1
+      UserData:
+        'Fn::Base64': !Sub |
+          #!/bin/bash -x
+          sudo yum install -y git
+          sudo amazon-linux-extras install nginx1
+          sudo service nginx start
+      Tags:
+        - Key: Name
+          Value: CP1EC2
+
+  EC2InstanceCP2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't2.micro'
+      SecurityGroupIds:
+      - !Ref InstanceCPSecurityGroup
+      KeyName: !Ref KeyName
+      ImageId: !Ref Ec2ImageId
+      # ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      SubnetId: !Ref PrivateSubnetWeb2
+      UserData:
+        'Fn::Base64': !Sub |
+          #!/bin/bash -x
+          sudo yum install -y git
+          sudo amazon-linux-extras install nginx1
+          sudo service nginx start
+      Tags:
+        - Key: Name
+          Value: CP2EC2
+
+  ### CPサーバセキュリティグループ
+  InstanceCPSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable access to VPN server'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        SourceSecurityGroupId: !GetAtt [ InstanceBastionSecurityGroup, GroupId ]
+      - IpProtocol: tcp
+        FromPort: 80
+        ToPort: 80
+        SourceSecurityGroupId: !GetAtt [ ALBSecurityGroup, GroupId ]
+
+  ## ------------踏み台サーバEC2インスタンス(amazon Linux2)-------------
+  EC2InstanceBastion:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      InstanceType: 't2.micro'
+      SecurityGroupIds:
+      - !Ref InstanceBastionSecurityGroup
+      KeyName: !Ref KeyName
+      ImageId: !Ref Ec2ImageId
+      # ImageId: !FindInMap [RegionMap, !Ref 'AWS::Region', AMI]
+      SubnetId: !Ref PublicSubnet1
+      UserData:
+        'Fn::Base64': !Sub |
+          #!/bin/bash -x
+          sudo yum update -y
+      Tags:
+        - Key: Name
+          Value: BastionEC2
+
+  ### 踏み台サーバセキュリティグループ
+  InstanceBastionSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: 'Enable access to CP and CMS server'
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 22
+        ToPort: 22
+        CidrIp: '0.0.0.0/0'
+        # SourceSecurityGroupId: !GetAtt [ ALBSecurityGroup, GroupId ]
+
+
+  # InstanceSecurityGroupIngress: 作成検討
+
+  ## --------ALB---------
+  InternetALBCP:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      LoadBalancerAttributes:
+        - Key: 'deletion_protection.enabled'
+          Value: 'false'
+        - Key: 'idle_timeout.timeout_seconds'
+          Value: 60
+      Name: !Sub ${EnvironmentName}ALB
+      Scheme: 'internet-facing'
+      SecurityGroups:
+        - !Ref ALBSecurityGroup
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      Tags:
+        - Key: Env
+          Value: 'prod'
+      Type: 'application'
+
+  # ListenerでALBを指定
+  ALBCPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      # AlpnPolicy:
+      #   - String
+      # Certificates:
+      #   - Certificate
+      DefaultActions:
+        - TargetGroupArn: !Ref ALBCPTargetGroup
+          Type: forward
+      LoadBalancerArn: !Ref InternetALBCP
+      Port: 80
+      Protocol: HTTP
+      #SslPolicy: String
+
+  ALBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupName: !Sub "${EnvironmentName}-alb-sg"
+      GroupDescription: 'Enable access from internet'
+      Tags:
+        - Key: "Name"
+          Value: !Sub "${EnvironmentName}-alb"
+    # Rule
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: "0.0.0.0/0"
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+
+  # TargetGroup
+  ALBCPTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: '/'
+      HealthCheckPort: 'traffic-port'
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 10
+      HealthyThresholdCount: 3
+      Matcher:
+        HttpCode: 200
+      Name: !Sub ${EnvironmentName}-alb-cp-tg
+      Port: 80
+      Protocol: HTTP
+      Tags:
+        - Key: 'Env'
+          Value: 'prod'
+      #TargetGroupAttributes:
+        #- TargetGroupAttribute
+      Targets:
+        - Id: !Ref EC2InstanceCP1
+        - Id: !Ref EC2InstanceCP2
+      TargetType: 'instance'
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC
+
+# -----------------------------------------------------------------------------#
+# 出力内容
+# -----------------------------------------------------------------------------#
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref VPC
+
+  PublicSubnets:
+    Description: A list of the public subnets
+    Value: !Join [ ",", [ !Ref PublicSubnet1, !Ref PublicSubnet2 ]]
+
+  PrivateSubnets:
+    Description: A list of the private subnets
+    Value: !Join [ ",", [ !Ref PrivateSubnetWeb1, !Ref PrivateSubnetWeb2, !Ref PrivateSubnetWeb3,
+                          !Ref PrivateSubnetDB1, !Ref PrivateSubnetDB2 ]]
+
+  PublicSubnet1:
+    Description: A reference to the public subnet in the 1st Availability Zone
+    Value: !Ref PublicSubnet1
+
+  PublicSubnet2:
+    Description: A reference to the public subnet in the 2nd Availability Zone
+    Value: !Ref PublicSubnet2
+
+  PrivateSubnetWeb1:
+    Description: A reference to the private subnet in the 1st Availability Zone
+    Value: !Ref PrivateSubnetWeb1
+
+  PrivateSubnetWeb2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnetWeb2
+
+  PrivateSubnetWeb3:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnetWeb3
+
+  PrivateSubnetDB1:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnetDB1
+
+  PrivateSubnetDB2:
+    Description: A reference to the private subnet in the 2nd Availability Zone
+    Value: !Ref PrivateSubnetDB2
+
+  NoIngressSecurityGroup:
+    Description: Security group with no ingress rule
+    Value: !Ref NoIngressSecurityGroup
+
+  EC2CP1PrivateIP:
+    Value: !GetAtt EC2InstanceCP1.PrivateIp
+    Description: Private IP of EC2 instance
+
+  EC2CP2PrivateIP:
+    Value: !GetAtt EC2InstanceCP2.PrivateIp
+    Description: Private IP of EC2 instance
+
+  EC2BastionPublicIP:
+    Value: !GetAtt EC2InstanceBastion.PublicIp
+    Description: Public IP of EC2 instance
+
+  ALB:
+    Description: DNS of ALB
+    Value: !GetAtt InternetALBCP.DNSName
